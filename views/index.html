@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KKM x Dynatrace | Health Tech Pulse</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f1f4f8;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: white;
+            padding: 12px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #eee;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .header-brand { display: flex; align-items: center; gap: 14px; }
+        .header-logo {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, #006643, #00875a);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 800; font-size: 13px; letter-spacing: -0.5px;
+        }
+        .header-title { font-size: 1.05em; font-weight: 700; color: #006643; }
+        .header-subtitle { font-size: 0.72em; color: #999; margin-top: 1px; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .live-badge {
+            background: #e8f5e9; color: #2e7d32;
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 0.72em; font-weight: 700;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .live-dot {
+            width: 7px; height: 7px;
+            background: #4caf50; border-radius: 50%;
+            animation: blink 1.8s infinite;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+        .last-updated { font-size: 0.72em; color: #aaa; }
+
+        /* ── Layout ── */
+        .main { padding: 20px 28px; max-width: 1400px; margin: 0 auto; }
+
+        /* ── Filter Bar ── */
+        .filter-bar {
+            background: white;
+            border-radius: 10px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 3px; padding: 0 16px; }
+        .filter-group:first-child { padding-left: 0; }
+        .filter-label {
+            font-size: 0.6em; font-weight: 800;
+            letter-spacing: 0.1em; text-transform: uppercase; color: #aaa;
+        }
+        .filter-select {
+            border: 1px solid #e4e7ec;
+            border-radius: 7px;
+            padding: 7px 30px 7px 10px;
+            font-size: 0.84em;
+            color: #333;
+            background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center;
+            appearance: none;
+            cursor: pointer;
+            min-width: 148px;
+            transition: border-color .2s;
+        }
+        .filter-select:focus { outline: none; border-color: #006643; }
+        .filter-divider { width: 1px; height: 38px; background: #f0f0f0; margin: 0 4px; }
+        .filter-search {
+            display: flex; align-items: center; gap: 8px;
+            border: 1px solid #e4e7ec;
+            border-radius: 7px;
+            padding: 7px 12px;
+            flex: 1; min-width: 200px;
+            transition: border-color .2s;
+        }
+        .filter-search:focus-within { border-color: #006643; }
+        .filter-search input {
+            border: none; outline: none;
+            font-size: 0.84em; color: #555;
+            background: transparent; flex: 1;
+        }
+        .filter-search svg { color: #bbb; flex-shrink: 0; }
+
+        /* ── KPI Grid ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px 20px 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 4px;
+        }
+        .kpi-card.blue::before   { background: #2563eb; }
+        .kpi-card.purple::before { background: #7c3aed; }
+        .kpi-card.amber::before  { background: #d97706; }
+        .kpi-card.green::before  { background: #059669; }
+
+        .kpi-label {
+            font-size: 0.6em; font-weight: 800;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            color: #aaa; margin-bottom: 10px;
+        }
+        .kpi-value {
+            font-size: 2.4em; font-weight: 800;
+            color: #111; line-height: 1;
+            margin-bottom: 7px;
+        }
+        .kpi-trend {
+            font-size: 0.78em; font-weight: 600;
+            margin-bottom: 12px; display: flex; align-items: center; gap: 4px;
+        }
+        .kpi-trend.up   { color: #16a34a; }
+        .kpi-trend.down { color: #dc2626; }
+        .kpi-chart-wrap { height: 62px; position: relative; }
+
+        /* ── Bottom Section ── */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 16px;
+        }
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .panel-title {
+            font-size: 0.85em; font-weight: 700; color: #222;
+            margin-bottom: 14px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .counts { display: flex; gap: 8px; }
+        .count-chip {
+            font-size: 0.75em; font-weight: 600;
+            padding: 2px 9px; border-radius: 20px;
+        }
+        .count-chip.normal   { background: #e8f5e9; color: #2e7d32; }
+        .count-chip.busy     { background: #fff8e1; color: #f57f17; }
+        .count-chip.critical { background: #ffebee; color: #c62828; }
+
+        /* Hospital Table */
+        .hosp-table { width: 100%; border-collapse: collapse; }
+        .hosp-table th {
+            font-size: 0.62em; font-weight: 800;
+            text-transform: uppercase; letter-spacing: 0.07em;
+            color: #bbb; text-align: left;
+            padding: 6px 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .hosp-table td {
+            font-size: 0.82em; padding: 10px 10px;
+            border-bottom: 1px solid #f8f8f8; color: #333;
+        }
+        .hosp-table tr:last-child td { border-bottom: none; }
+        .hosp-table tr:hover td { background: #fafbfc; }
+        .hosp-name { font-weight: 600; }
+        .hosp-short { font-size: 0.75em; color: #aaa; font-weight: 400; }
+
+        .status-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 0.78em; font-weight: 600;
+            padding: 3px 9px; border-radius: 20px;
+        }
+        .status-chip.normal   { background: #e8f5e9; color: #2e7d32; }
+        .status-chip.busy     { background: #fff8e1; color: #f57f17; }
+        .status-chip.critical { background: #ffebee; color: #c62828; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+        .occ-cell { min-width: 90px; }
+        .occ-pct  { font-size: 0.85em; font-weight: 600; margin-bottom: 3px; }
+        .occ-bar  { height: 5px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+        .occ-fill { height: 100%; border-radius: 3px; }
+        .occ-fill.normal   { background: #10b981; }
+        .occ-fill.busy     { background: #f59e0b; }
+        .occ-fill.critical { background: #ef4444; }
+
+        /* ── Controls Panel ── */
+        .controls-section { display: flex; flex-direction: column; gap: 16px; }
+
+        .anomaly-btn {
+            width: 100%;
+            background: #ff6f00; color: white;
+            border: none; padding: 11px 16px;
+            border-radius: 8px; font-size: 0.84em; font-weight: 600;
+            cursor: pointer; transition: background .2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .anomaly-btn:hover { background: #e65c00; }
+        .anomaly-msg {
+            font-size: 0.78em; color: #006643; margin-top: 8px;
+            min-height: 18px; font-weight: 500; line-height: 1.4;
+        }
+
+        .obs-status {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .obs-title { font-size: 0.75em; font-weight: 700; color: #444; margin-bottom: 10px; }
+        .obs-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.8em;
+            color: #555;
+        }
+        .obs-row:last-child { border-bottom: none; }
+        .obs-val { font-weight: 600; }
+        .obs-val.ok   { color: #16a34a; }
+        .obs-val.warn { color: #d97706; }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 18px;
+            font-size: 0.72em;
+            color: #bbb;
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .bottom-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            .main { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-brand">
+        <div class="header-logo">KKM</div>
+        <div>
+            <div class="header-title">Kementerian Kesihatan Malaysia</div>
+            <div class="header-subtitle">Smart Hospital Operations &amp; Observability Portal</div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+        <div class="last-updated" id="last-updated">Connecting...</div>
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <div class="filter-label">Hospital</div>
+            <select class="filter-select" id="f-hospital">
+                <option>All Hospitals</option>
+                <option>Hospital Kuala Lumpur</option>
+                <option>Hospital Putrajaya</option>
+                <option>Hospital Selayang</option>
+                <option>Hospital Ampang</option>
+                <option>Hospital Serdang</option>
+                <option>Hospital Kajang</option>
+                <option>Hospital Tengku Ampuan Rahimah</option>
+            </select>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+            <div class="filter-label">Region</div>
+            <select class="filter-select" id="f-region">
+                <option>All Regions</option>
+                <option>Kuala Lumpur</option>
+                <option>Selangor</option>
+                <option>Putrajaya</option>
+                <option>Johor</option>
+                <option>Penang</option>
+            </select>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+            <div class="filter-label">Department</div>
+            <select class="filter-select" id="f-dept">
+                <option>All Departments</option>
+                <option>Emergency</option>
+                <option>Outpatient</option>
+                <option>ICU</option>
+                <option>Surgery</option>
+                <option>Paediatrics</option>
+            </select>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+            <div class="filter-label">Patient Status</div>
+            <select class="filter-select" id="f-status">
+                <option>All</option>
+                <option>Waiting</option>
+                <option>In Treatment</option>
+                <option>Discharged</option>
+            </select>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="filter-search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input type="text" placeholder="Patient ID / Ward Number...">
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card blue">
+            <div class="kpi-label">Active Patients</div>
+            <div class="kpi-value" id="v-patients">—</div>
+            <div class="kpi-trend up" id="t-patients">Loading...</div>
+            <div class="kpi-chart-wrap"><canvas id="c-patients"></canvas></div>
+        </div>
+        <div class="kpi-card purple">
+            <div class="kpi-label">Total Visits Today</div>
+            <div class="kpi-value" id="v-visits">—</div>
+            <div class="kpi-trend up" id="t-visits">Loading...</div>
+            <div class="kpi-chart-wrap"><canvas id="c-visits"></canvas></div>
+        </div>
+        <div class="kpi-card amber">
+            <div class="kpi-label">Bed Occupancy Rate</div>
+            <div class="kpi-value" id="v-beds">—</div>
+            <div class="kpi-trend" id="t-beds">Loading...</div>
+            <div class="kpi-chart-wrap"><canvas id="c-beds"></canvas></div>
+        </div>
+        <div class="kpi-card green">
+            <div class="kpi-label">Active Wards</div>
+            <div class="kpi-value" id="v-wards">—</div>
+            <div class="kpi-trend up" id="t-wards">Loading...</div>
+            <div class="kpi-chart-wrap"><canvas id="c-wards"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Bottom Section -->
+    <div class="bottom-grid">
+
+        <!-- Hospital Table -->
+        <div class="panel">
+            <div class="panel-title">
+                Hospital Status Overview
+                <div class="counts" id="status-counts">
+                    <span class="count-chip normal">● Normal: –</span>
+                    <span class="count-chip busy">● Busy: –</span>
+                    <span class="count-chip critical">● Critical: –</span>
+                </div>
+            </div>
+            <table class="hosp-table">
+                <thead>
+                    <tr>
+                        <th>Hospital</th>
+                        <th>Region</th>
+                        <th>Department</th>
+                        <th>Patients</th>
+                        <th>Bed Occupancy</th>
+                        <th>Avg Wait</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="hosp-tbody">
+                    <tr><td colspan="7" style="text-align:center;color:#bbb;padding:24px;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Controls -->
+        <div class="panel">
+            <div class="panel-title">System Controls</div>
+            <div class="controls-section">
+                <div>
+                    <button class="anomaly-btn" onclick="triggerAnomaly()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                        Simulate Traffic Spike (Test Davis AI)
+                    </button>
+                    <div class="anomaly-msg" id="anomaly-msg"></div>
+                </div>
+
+                <div class="obs-status">
+                    <div class="obs-title">Dynatrace Observability</div>
+                    <div class="obs-row">
+                        <span>OneAgent</span>
+                        <span class="obs-val ok">● Connected</span>
+                    </div>
+                    <div class="obs-row">
+                        <span>Davis AI</span>
+                        <span class="obs-val ok">● Active</span>
+                    </div>
+                    <div class="obs-row">
+                        <span>Metrics Ingest</span>
+                        <span class="obs-val ok">● Real-time</span>
+                    </div>
+                    <div class="obs-row">
+                        <span>Open Alerts</span>
+                        <span class="obs-val warn" id="alert-count">2 Open</span>
+                    </div>
+                    <div class="obs-row">
+                        <span>Last Sync</span>
+                        <span class="obs-val" id="sync-time" style="color:#aaa;">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="footer">Powered by Node.js &amp; observed via <strong>Dynatrace OneAgent</strong></div>
+
+<script>
+    const COLORS = {
+        blue:   '#2563eb',
+        purple: '#7c3aed',
+        amber:  '#d97706',
+        green:  '#059669',
+    };
+
+    function mkChart(id, color) {
+        const ctx = document.getElementById(id).getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, 62);
+        grad.addColorStop(0, color + '33');
+        grad.addColorStop(1, color + '00');
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(30).fill(''),
+                datasets: [{
+                    data: Array(30).fill(0),
+                    borderColor: color,
+                    borderWidth: 2,
+                    backgroundColor: grad,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                scales: {
+                    x: { display: false },
+                    y: { display: false },
+                },
+                animation: { duration: 400 },
+            }
+        });
+    }
+
+    const charts = {
+        patients: mkChart('c-patients', COLORS.blue),
+        visits:   mkChart('c-visits',   COLORS.purple),
+        beds:     mkChart('c-beds',     COLORS.amber),
+        wards:    mkChart('c-wards',    COLORS.green),
+    };
+
+    function updateChart(chart, data) {
+        chart.data.datasets[0].data = data;
+        chart.update('none');
+    }
+
+    function fmt(n) { return n.toLocaleString(); }
+    function pct(a, b) { return Math.round(((a - b) / b) * 100); }
+
+    function arrow(val) { return val >= 0 ? '↑' : '↓'; }
+
+    function renderTrend(elId, value, suffix, label, isGoodUp = true) {
+        const el = document.getElementById(elId);
+        const up = value >= 0;
+        const good = isGoodUp ? up : !up;
+        el.className = 'kpi-trend ' + (good ? 'up' : 'down');
+        el.textContent = `${arrow(value)} ${Math.abs(value)}${suffix} ${label}`;
+    }
+
+    function renderHospitals(hospitals) {
+        const tbody = document.getElementById('hosp-tbody');
+        let normal = 0, busy = 0, critical = 0;
+
+        const rows = hospitals.map(h => {
+            if (h.status === 'normal') normal++;
+            else if (h.status === 'busy') busy++;
+            else critical++;
+
+            const occClass = h.status === 'critical' ? 'critical' : h.status === 'busy' ? 'busy' : 'normal';
+            return `<tr>
+                <td>
+                    <div class="hosp-name">${h.name}</div>
+                    <div class="hosp-short">${h.short}</div>
+                </td>
+                <td>${h.region}</td>
+                <td>${h.dept}</td>
+                <td>${fmt(h.activePatients)}</td>
+                <td class="occ-cell">
+                    <div class="occ-pct">${h.occupancy}%</div>
+                    <div class="occ-bar"><div class="occ-fill ${occClass}" style="width:${h.occupancy}%"></div></div>
+                </td>
+                <td>${h.avgWait} min</td>
+                <td><span class="status-chip ${h.status}"><span class="status-dot"></span>${h.status.charAt(0).toUpperCase() + h.status.slice(1)}</span></td>
+            </tr>`;
+        });
+        tbody.innerHTML = rows.join('');
+
+        document.getElementById('status-counts').innerHTML =
+            `<span class="count-chip normal">● Normal: ${normal}</span>
+             <span class="count-chip busy">● Busy: ${busy}</span>
+             <span class="count-chip critical">● Critical: ${critical}</span>`;
+    }
+
+    async function fetchData() {
+        try {
+            const res = await fetch('/api/status');
+            const d = await res.json();
+
+            document.getElementById('v-patients').textContent = fmt(d.activePatients);
+            document.getElementById('v-visits').textContent   = fmt(d.totalVisits);
+            document.getElementById('v-beds').textContent     = d.bedOccupancy + '%';
+            document.getElementById('v-wards').textContent    = d.activeWards;
+
+            const patDelta = pct(d.activePatients, d.prevPatients);
+            renderTrend('t-patients', patDelta, '%', `vs ${fmt(d.prevPatients)} yesterday`);
+
+            const visDelta = pct(d.totalVisits, d.prevVisits);
+            renderTrend('t-visits', visDelta, '%', `vs ${fmt(d.prevVisits)} yesterday`);
+
+            const bedDelta = +(d.bedOccupancy - d.targetOcc).toFixed(1);
+            renderTrend('t-beds', -Math.abs(bedDelta), '%', `target: ${d.targetOcc}%`, false);
+            // Show actual direction vs target
+            const tBed = document.getElementById('t-beds');
+            tBed.className = 'kpi-trend ' + (d.bedOccupancy > d.targetOcc ? 'down' : 'up');
+            tBed.textContent = `${d.bedOccupancy > d.targetOcc ? '↑' : '↓'} ${Math.abs(bedDelta)}% vs target: ${d.targetOcc}%`;
+
+            const wardDelta = d.activeWards - d.prevWards;
+            renderTrend('t-wards', wardDelta, '', `new in last 30 min`);
+
+            updateChart(charts.patients, d.history.patients);
+            updateChart(charts.visits,   d.history.visits);
+            updateChart(charts.beds,     d.history.beds);
+            updateChart(charts.wards,    d.history.wards);
+
+            renderHospitals(d.hospitals);
+
+            const ts = new Date(d.timestamp);
+            document.getElementById('last-updated').textContent =
+                'Updated ' + ts.toLocaleTimeString();
+            document.getElementById('sync-time').textContent =
+                ts.toLocaleTimeString();
+
+        } catch (e) {
+            console.error('Fetch error', e);
+        }
+    }
+
+    async function triggerAnomaly() {
+        const msg = document.getElementById('anomaly-msg');
+        msg.style.color = '#f57f17';
+        msg.textContent = 'Injecting load spike...';
+        try {
+            const res = await fetch('/api/trigger-anomaly');
+            const d = await res.json();
+            msg.style.color = '#006643';
+            msg.textContent = d.message;
+            document.getElementById('alert-count').textContent = '3 Open';
+            document.getElementById('alert-count').className = 'obs-val down';
+        } catch(e) {
+            msg.style.color = '#dc2626';
+            msg.textContent = 'Request failed.';
+        }
+    }
+
+    fetchData();
+    setInterval(fetchData, 5000);
+</script>
+</body>
+</html>
