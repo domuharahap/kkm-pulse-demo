@@ -33,6 +33,12 @@ app.get('/api/trigger-anomaly', (req, res) => {
     res.json({ message: "Anomaly injected! Check your Dynatrace Davis AI dashboard for the CPU spike alert." });
 });
 
-app.listen(PORT, () => {
-    console.log(`KKM Pulse App running hot on port ${PORT} 🚀`);
-});
+// Only listen if run directly (prevents port-in-use errors during testing)
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`KKM Pulse App running hot on port ${PORT} 🚀`);
+    });
+}
+
+// Export app for Jest tests
+module.exports = app;
