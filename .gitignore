@@ -3,6 +3,7 @@
 
 # Ignore a whole folder (like node_modules)
 node_modules/
+test-results/
 
 # Ignore all files with a specific extension
 *.log
