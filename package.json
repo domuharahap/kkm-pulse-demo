@@ -7,10 +7,26 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest --reporters=default --reporters=jest-junit"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 10000
+  },
+  "jest-junit": {
+    "outputDirectory": "test-results",
+    "outputName": "junit.xml",
+    "classNameTemplate": "{classname}",
+    "titleTemplate": "{title}"
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "supertest": "^6.3.4"
   },
   "keywords": []
 }
