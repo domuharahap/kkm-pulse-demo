@@ -1,0 +1,68 @@
+stages:
+  - build
+  - test
+  - build-sonar
+
+build-job:
+  image: node:18-alpine
+  tags: 
+   - shell
+  stage: build
+  script:
+    - npm install
+  artifacts:
+    paths:
+      - node_modules/
+      - package-lock.json
+    expire_in: 1 hour
+
+test-job:
+  image: node:18-alpine
+  stage: test
+  tags: 
+   - shell
+  script:
+    - npm test
+  dependencies:
+    - build-job
+
+sast:
+  stage: test
+  tags:
+    - shell
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+
+
+variables:
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  SAST_DISABLED: "true"  # Shell executor in DevContainer cannot run SAST analyzer Docker images
+
+build-sonar:
+  image:
+    name: sonarsource/sonar-scanner-cli:11
+    entrypoint: [""]
+  stage: build-sonar
+  cache:
+    policy: pull-push
+    key: "sonar-cache-$CI_COMMIT_REF_SLUG"
+    paths:
+      - "${SONAR_USER_HOME}/cache"
+      - sonar-scanner/
+      
+  script: 
+    - sonar-scanner -Dsonar.host.url="${SONAR_HOST_URL}"
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == 'master'
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH == 'develop'
+
+.deploy-job:
+  stage: deploy
+  script:
+    - echo "Deploying the application..."
+    - kubectl apply -f deployment.yaml
+    - echo "Deployment completed."
